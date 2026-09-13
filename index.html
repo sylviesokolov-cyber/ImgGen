@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0f">
+<title>ImgGen</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0b0f;
+    --surface: #16161d;
+    --surface-2: #1e1e27;
+    --text: #f2f2f5;
+    --muted: #9a9aa5;
+    --accent: #7c5cff;
+    --danger: #ff6b6b;
+    --border: #2a2a34;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Roboto, "Segoe UI", system-ui, sans-serif;
+  }
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-size: 17px;
+    margin: 0;
+    font-weight: 600;
+  }
+  header .icon-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 20px;
+    padding: 6px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  nav.tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  nav.tabs button {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 10px 0;
+    font-size: 13px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  nav.tabs button.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+  main {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .screen { display: none; height: 100%; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  /* --- Generate --- */
+  #result {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 16px;
+    border-radius: 16px;
+    background: var(--surface);
+    overflow: hidden;
+    min-height: 200px;
+    position: relative;
+  }
+  #result img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  #result .placeholder { color: var(--muted); font-size: 14px; text-align: center; padding: 24px; }
+  .spinner {
+    width: 28px; height: 28px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #status-text { color: var(--muted); font-size: 13px; margin-top: 10px; }
+  .loading-box { display: flex; flex-direction: column; align-items: center; }
+
+  #error-banner {
+    margin: 0 16px 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255,107,107,0.12);
+    color: var(--danger);
+    font-size: 13px;
+    display: none;
+  }
+  #error-banner.show { display: block; }
+  #error-banner a { color: var(--danger); text-decoration: underline; }
+
+  .composer {
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  textarea#prompt {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    padding: 12px;
+    font-size: 15px;
+    resize: none;
+    font-family: inherit;
+  }
+  button.primary {
+    width: 100%;
+    margin-top: 10px;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: var(--accent);
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.primary:disabled { opacity: 0.5; }
+  .action-row { display: flex; gap: 8px; margin-top: 10px; }
+  .action-row button {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .action-row button:disabled { opacity: 0.4; }
+
+  /* --- History --- */
+  #history-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+    padding: 3px;
+  }
+  #history-grid .thumb {
+    aspect-ratio: 1;
+    background: var(--surface);
+    overflow: hidden;
+    cursor: pointer;
+  }
+  #history-grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #history-empty { color: var(--muted); text-align: center; padding: 60px 24px; font-size: 14px; }
+
+  /* --- Viewer overlay --- */
+  #viewer {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.96);
+    display: none;
+    flex-direction: column;
+    z-index: 20;
+  }
+  #viewer.show { display: flex; }
+  #viewer .viewer-top {
+    display: flex;
+    justify-content: space-between;
+    padding: 14px 16px calc(10px + env(safe-area-inset-top));
+  }
+  #viewer .viewer-top button {
+    background: none; border: none; color: white; font-size: 20px; cursor: pointer;
+  }
+  #viewer .viewer-img-wrap { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #viewer img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  #viewer .viewer-bottom {
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    font-size: 13px;
+    color: #ddd;
+  }
+  #viewer .viewer-actions { display: flex; gap: 8px; margin-top: 10px; }
+  #viewer .viewer-actions a, #viewer .viewer-actions button {
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid #3a3a44;
+    background: #1e1e27;
+    color: white;
+    font-size: 13px;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  #viewer .viewer-actions .delete { color: var(--danger); border-color: rgba(255,107,107,0.3); }
+
+  /* --- Settings --- */
+  .settings-body { padding: 20px 16px; }
+  .field-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; display: block; }
+  .field { margin-bottom: 20px; }
+  input[type="password"], input[type="text"] {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    padding: 12px;
+    font-size: 15px;
+  }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+  .hint a { color: var(--accent); }
+  #save-settings {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  #settings-saved { color: #6fd08c; font-size: 13px; margin-top: 10px; display: none; }
+  details summary { color: var(--muted); font-size: 13px; cursor: pointer; margin: 4px 0 16px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <h1>ImgGen</h1>
+    <button class="icon-btn" onclick="showTab('settings')" aria-label="Settings">&#9881;</button>
+  </header>
+
+  <nav class="tabs">
+    <button id="tab-generate" class="active" onclick="showTab('generate')">Generate</button>
+    <button id="tab-history" onclick="showTab('history')">History</button>
+    <button id="tab-settings" onclick="showTab('settings')">Settings</button>
+  </nav>
+
+  <main>
+    <!-- Generate -->
+    <section id="screen-generate" class="screen active">
+      <div id="error-banner"></div>
+      <div id="result">
+        <div class="placeholder">Your image will appear here</div>
+      </div>
+      <div class="composer">
+        <textarea id="prompt" rows="2" placeholder="Describe the image you want…"></textarea>
+        <button class="primary" id="generate-btn" onclick="generate()">Generate</button>
+        <div class="action-row">
+          <button id="reroll-btn" onclick="reroll()" disabled>&#8635; Re-roll</button>
+          <button id="save-btn" onclick="saveCurrentToDevice()" disabled>&#8595; Save to phone</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- History -->
+    <section id="screen-history" class="screen">
+      <div id="history-empty" style="display:none;">No images yet</div>
+      <div id="history-grid"></div>
+    </section>
+
+    <!-- Settings -->
+    <section id="screen-settings" class="screen">
+      <div class="settings-body">
+        <div class="field">
+          <label class="field-label">OpenRouter API key</label>
+          <input type="password" id="api-key" placeholder="sk-or-v1-…">
+          <div class="hint">
+            From <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>.
+            Stored only in this browser, on this phone — never sent anywhere but openrouter.ai.
+          </div>
+        </div>
+
+        <details>
+          <summary>Advanced</summary>
+          <div class="field">
+            <label class="field-label">Model slug</label>
+            <input type="text" id="model-slug" placeholder="meta/muse-image">
+            <div class="hint">Default: meta/muse-image</div>
+          </div>
+        </details>
+
+        <button id="save-settings" onclick="saveSettings()">Save</button>
+        <div id="settings-saved">Saved.</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Fullscreen viewer -->
+<div id="viewer">
+  <div class="viewer-top">
+    <button onclick="closeViewer()" aria-label="Close">&times;</button>
+    <span></span>
+  </div>
+  <div class="viewer-img-wrap"><img id="viewer-img" src="" alt=""></div>
+  <div class="viewer-bottom">
+    <div id="viewer-prompt"></div>
+    <div class="viewer-actions">
+      <a id="viewer-download" download="imggen.png" href="#">Save to phone</a>
+      <button class="delete" onclick="deleteViewerImage()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- Storage ---------- */
+const LS_KEY_API = "imggen_api_key";
+const LS_KEY_MODEL = "imggen_model";
+const LS_KEY_HISTORY = "imggen_history"; // array of {id, prompt, dataUrl, mimeType, createdAt}
+const DEFAULT_MODEL = "meta/muse-image";
+
+function getApiKey() { return localStorage.getItem(LS_KEY_API) || ""; }
+function getModel() { return localStorage.getItem(LS_KEY_MODEL) || DEFAULT_MODEL; }
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY_HISTORY) || "[]"); }
+  catch (e) { return []; }
+}
+function saveHistory(list) {
+  try {
+    localStorage.setItem(LS_KEY_HISTORY, JSON.stringify(list));
+  } catch (e) {
+    // localStorage quota exceeded (base64 images add up fast). Drop the
+    // oldest half and try again once; if it still fails, give up quietly
+    // rather than losing the image the user just generated.
+    if (list.length > 4) {
+      const trimmed = list.slice(0, Math.ceil(list.length / 2));
+      try { localStorage.setItem(LS_KEY_HISTORY, JSON.stringify(trimmed)); } catch (e2) { /* give up */ }
+    }
+  }
+}
+
+/* ---------- Tabs ---------- */
+function showTab(name) {
+  ["generate", "history", "settings"].forEach(n => {
+    document.getElementById("screen-" + n).classList.toggle("active", n === name);
+    document.getElementById("tab-" + n).classList.toggle("active", n === name);
+  });
+  if (name === "history") renderHistoryGrid();
+}
+
+/* ---------- Settings screen ---------- */
+function saveSettings() {
+  document.getElementById("api-key").value.trim() &&
+    localStorage.setItem(LS_KEY_API, document.getElementById("api-key").value.trim());
+  const model = document.getElementById("model-slug").value.trim();
+  localStorage.setItem(LS_KEY_MODEL, model || DEFAULT_MODEL);
+  const saved = document.getElementById("settings-saved");
+  saved.style.display = "block";
+  setTimeout(() => saved.style.display = "none", 1500);
+}
+function loadSettingsForm() {
+  document.getElementById("api-key").value = getApiKey();
+  document.getElementById("model-slug").value = getModel();
+}
+
+/* ---------- Generate ---------- */
+let lastPrompt = "";
+let currentEntry = null; // the HistoryEntry just generated, for save/re-roll
+
+function showError(message, opts) {
+  const el = document.getElementById("error-banner");
+  el.innerHTML = message;
+  if (opts && opts.openSettings) {
+    el.innerHTML += ' <a href="#" onclick="showTab(\'settings\');return false;">Open Settings</a>';
+  }
+  el.classList.add("show");
+}
+function clearError() {
+  document.getElementById("error-banner").classList.remove("show");
+}
+
+function setResultLoading() {
+  document.getElementById("result").innerHTML =
+    '<div class="loading-box"><div class="spinner"></div><div id="status-text">This can take a little while…</div></div>';
+}
+function setResultImage(dataUrl, prompt) {
+  const wrap = document.getElementById("result");
+  wrap.innerHTML = "";
+  const img = document.createElement("img");
+  img.src = dataUrl;
+  img.alt = prompt;
+  wrap.appendChild(img);
+}
+function setResultPlaceholder(text) {
+  document.getElementById("result").innerHTML = '<div class="placeholder">' + text + '</div>';
+}
+
+async function generate() {
+  const promptEl = document.getElementById("prompt");
+  const prompt = promptEl.value.trim();
+  if (!prompt) return;
+
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    showError("Add your OpenRouter API key in Settings first.", { openSettings: true });
+    showTab("settings");
+    return;
+  }
+
+  clearError();
+  document.getElementById("generate-btn").disabled = true;
+  document.getElementById("reroll-btn").disabled = true;
+  document.getElementById("save-btn").disabled = true;
+  setResultLoading();
+
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + apiKey,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://imggen.app",
+        "X-Title": "ImgGen",
+      },
+      body: JSON.stringify({
+        model: getModel(),
+        messages: [{ role: "user", content: prompt }],
+        modalities: ["image", "text"],
+      }),
+    });
+
+    const raw = await res.text();
+
+    if (res.status === 401) {
+      showError("API key was rejected. Check it in Settings.", { openSettings: true });
+      setResultPlaceholder("Your image will appear here");
+      return;
+    }
+    if (res.status === 402) {
+      showError('Out of OpenRouter credit. <a href="https://openrouter.ai/credits" target="_blank" rel="noopener">Top up</a>.');
+      setResultPlaceholder("Your image will appear here");
+      return;
+    }
+    if (res.status === 429) {
+      const retryAfter = res.headers.get("Retry-After");
+      showError("Rate limited." + (retryAfter ? " Try again in " + retryAfter + "s." : ""));
+      setResultPlaceholder("Your image will appear here");
+      return;
+    }
+    if (res.status >= 500) {
+      showError("OpenRouter had a server error. Try again.");
+      setResultPlaceholder("Your image will appear here");
+      return;
+    }
+    if (!res.ok) {
+      let msg = "Request failed (HTTP " + res.status + ").";
+      try { msg = (JSON.parse(raw).error || {}).message || msg; } catch (e) {}
+      showError(msg);
+      setResultPlaceholder("Your image will appear here");
+      return;
+    }
+
+    const json = JSON.parse(raw);
+    const message = json.choices[0].message;
+    const images = message.images;
+
+    if (!images || images.length === 0) {
+      const text = (message.content || "The model didn't return an image.").trim();
+      showError("The model declined: " + escapeHtml(text));
+      setResultPlaceholder("Your image will appear here");
+      return;
+    }
+
+    const dataUrl = images[0].image_url.url;
+    const mimeMatch = /^data:([^;]+);base64,/.exec(dataUrl);
+    const mimeType = mimeMatch ? mimeMatch[1] : "image/png";
+
+    setResultImage(dataUrl, prompt);
+
+    const entry = {
+      id: String(Date.now()) + "_" + Math.random().toString(36).slice(2, 8),
+      prompt: prompt,
+      dataUrl: dataUrl,
+      mimeType: mimeType,
+      createdAt: Date.now(),
+    };
+    const history = loadHistory();
+    history.unshift(entry);
+    saveHistory(history);
+
+    currentEntry = entry;
+    lastPrompt = prompt;
+    document.getElementById("reroll-btn").disabled = false;
+    document.getElementById("save-btn").disabled = false;
+
+  } catch (e) {
+    showError("Network error: " + escapeHtml(e.message || String(e)));
+    setResultPlaceholder("Your image will appear here");
+  } finally {
+    document.getElementById("generate-btn").disabled = false;
+  }
+}
+
+function reroll() {
+  if (!lastPrompt) return;
+  document.getElementById("prompt").value = lastPrompt;
+  generate();
+}
+
+function saveCurrentToDevice() {
+  if (!currentEntry) return;
+  triggerDownload(currentEntry.dataUrl, fileNameFor(currentEntry));
+}
+
+function fileNameFor(entry) {
+  const ext = entry.mimeType.includes("png") ? "png" : "jpg";
+  return "imggen_" + entry.createdAt + "." + ext;
+}
+
+function triggerDownload(dataUrl, filename) {
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function escapeHtml(s) {
+  const div = document.createElement("div");
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+/* ---------- History screen ---------- */
+function renderHistoryGrid() {
+  const history = loadHistory();
+  const grid = document.getElementById("history-grid");
+  const empty = document.getElementById("history-empty");
+  grid.innerHTML = "";
+  empty.style.display = history.length === 0 ? "block" : "none";
+
+  history.forEach(entry => {
+    const cell = document.createElement("div");
+    cell.className = "thumb";
+    const img = document.createElement("img");
+    img.src = entry.dataUrl;
+    img.alt = entry.prompt;
+    img.loading = "lazy";
+    cell.appendChild(img);
+    cell.onclick = () => openViewer(entry.id);
+    grid.appendChild(cell);
+  });
+}
+
+/* ---------- Fullscreen viewer ---------- */
+let viewerEntryId = null;
+
+function openViewer(id) {
+  const entry = loadHistory().find(e => e.id === id);
+  if (!entry) return;
+  viewerEntryId = id;
+  document.getElementById("viewer-img").src = entry.dataUrl;
+  document.getElementById("viewer-prompt").textContent = entry.prompt;
+  const dl = document.getElementById("viewer-download");
+  dl.href = entry.dataUrl;
+  dl.download = fileNameFor(entry);
+  document.getElementById("viewer").classList.add("show");
+}
+function closeViewer() {
+  document.getElementById("viewer").classList.remove("show");
+  viewerEntryId = null;
+}
+function deleteViewerImage() {
+  if (!viewerEntryId) return;
+  const history = loadHistory().filter(e => e.id !== viewerEntryId);
+  saveHistory(history);
+  closeViewer();
+  renderHistoryGrid();
+}
+
+/* ---------- Init ---------- */
+loadSettingsForm();
+if (!getApiKey()) showTab("settings");
+</script>
+</body>
+</html>
