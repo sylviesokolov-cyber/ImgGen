@@ -299,8 +299,14 @@
           <summary>Advanced</summary>
           <div class="field">
             <label class="field-label">Model slug</label>
-            <input type="text" id="model-slug" placeholder="meta/muse-image">
-            <div class="hint">Default: meta/muse-image</div>
+            <input type="text" id="model-slug" placeholder="google/gemini-3.1-flash-image">
+            <div class="hint">
+              Default: google/gemini-3.1-flash-image (Nano Banana 2).
+              Meta's Muse Image (meta/muse-image) is licensed to exclude
+              the EU entirely, so it 403s there with "not available in
+              your region" no matter what this app does — pick a
+              different model if that's you.
+            </div>
           </div>
         </details>
 
@@ -332,7 +338,10 @@
 const LS_KEY_API = "imggen_api_key";
 const LS_KEY_MODEL = "imggen_model";
 const LS_KEY_HISTORY = "imggen_history"; // array of {id, prompt, dataUrl, mimeType, createdAt}
-const DEFAULT_MODEL = "meta/muse-image";
+// Nano Banana 2. Not Muse Image: Meta's license for its multimodal
+// models excludes the EU outright, so it 403s there regardless of what
+// this app sends -- see the hint text in Settings.
+const DEFAULT_MODEL = "google/gemini-3.1-flash-image";
 
 function getApiKey() { return localStorage.getItem(LS_KEY_API) || ""; }
 function getModel() { return localStorage.getItem(LS_KEY_MODEL) || DEFAULT_MODEL; }
