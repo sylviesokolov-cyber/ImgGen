@@ -1,33 +1,35 @@
-# ImgGen — Android text-to-image client for OpenRouter
+# ImgGen — uncensored text-to-image on Android
 
-**Status: plan only. No code written yet.**
+**Status: plan only. No code written.**
 
-A power-user Android client for OpenRouter's image models (Nano Banana 2, Muse Image, and whatever comes next) with the parameter control that first-party apps don't give you — seed locking, reference images, masks, batch, provider routing, real cost tracking, and a fully searchable local library.
+Goal: type a prompt, get an image, no filtering, no parameters to fiddle with.
 
-## Read in order
+## Start here
 
-| Doc | Contents |
-|---|---|
-| **[docs/00-landscape.md](docs/00-landscape.md)** | Does a good free app already exist? (Answer: partly — read this before building anything) |
-| **[docs/01-api-reference.md](docs/01-api-reference.md)** | OpenRouter's image surface: endpoints, auth, capability discovery, model shortlist |
-| **[docs/02-architecture.md](docs/02-architecture.md)** | Stack, module layout, the `ImageBackend` abstraction, job pipeline, memory, security |
-| **[docs/03-ui.md](docs/03-ui.md)** | Screens, navigation, the three disclosure tiers, visual design |
-| **[docs/04-features.md](docs/04-features.md)** | Feature set ranked in three tiers, plus what we're explicitly not building |
-| **[docs/05-setup.md](docs/05-setup.md)** | Toolchain, repo layout, secrets, testing, CI, and the Phase 0 probe |
-| **[docs/06-roadmap.md](docs/06-roadmap.md)** | Phases, estimates, risks |
+**The OpenRouter plan is dead.** Nano Banana 2 and Muse Image are filtered server-side by Google and Meta. OpenRouter is a router, not a filter — it cannot turn off someone else's moderation, and neither can any app built on top of it. No parameter, header, or prompt trick changes this.
 
-## Executive summary
+Unfiltered output comes from exactly one place: **open-weight models** (FLUX.1-dev, SDXL, **Chroma**, Qwen-Image, Z-Image) running somewhere that doesn't wrap them in a safety checker.
 
-**Should you build it?** Free apps (Gemini, Copilot) give you frontier quality with near-zero control. Free open-source apps (Local Dream, SDAI) give you deep control with SD1.5-class quality. **Nothing gives you frontier quality *and* deep control *and* your own key.** That gap is real, so yes — but validate the workflow with a $5 top-up and some `curl` first.
+## Three paths, cheapest first
 
-**The three decisions that matter:**
+| | Path | Build effort | Cost | Private? |
+|---|---|---|---|---|
+| **A** | **Local Dream** — on-device, Snapdragon NPU, SDXL on 8 Gen 3+ | **none** | free | ✅ fully |
+| **B** | **Your ComfyUI + an existing phone client** (Comfy Portal, ComfyChair) over Tailscale | **none** | free w/ own GPU | ✅ fully |
+| **C** | **Build a one-field app** over a hosted uncensored API (Chroma ~$0.015/img, Novita ~$0.0015/img) | 1.5–2 weeks | per image | ❌ host logs prompts |
 
-1. **Capability-driven parameter UI.** Fetch `supported_parameters` per model+provider from OpenRouter and *generate* the control panel from it. Hardcoding a param panel per model means breaking on every model refresh. This is the structural reason the app is worth building.
-2. **One serializable `GenerationRequest`** that doubles as job payload, image sidecar, preset, and share format. Re-roll, fork, compare, and provenance all fall out of it for free.
-3. **WorkManager + stream base64 to disk.** Renders are slow and expensive; they must survive a locked screen, and a 4K base64 PNG will OOM you if you decode it naively.
+**Try A, then B, and stop as soon as one works.** Both require writing zero code. Only build C if you've tried both and specifically want hosted speed with a one-field UI on any phone.
 
-**Stack:** Kotlin · Compose (Material 3 Expressive) · Ktor 3 · Room · Hilt · WorkManager · Coil 3 · Keystore-backed encrypted key storage.
+## Docs
 
-**Effort:** ~7–10 weeks part-time to v1. Ship Phase 1 to your own phone in week one and use it before building anything else.
+- **[docs/decision-uncensored.md](docs/decision-uncensored.md)** — why hosted frontier models can't do this, what actually can, the three paths compared, provider pricing, and the provider-independence rule
+- **[docs/build-plan.md](docs/build-plan.md)** — if you build Path C: the single-screen design, architecture, phases, distribution
+- **[docs/archive/](docs/archive/)** — the superseded OpenRouter deep-control plan
 
-**Next step:** the Phase 0 probe in [docs/05-setup.md §5.6](docs/05-setup.md) — half a day, resolves every open API question, and produces the test fixtures the whole network layer will use.
+## If you build it
+
+One screen: prompt field, three aspect chips, generate button, image. Swipe for history, pull to re-roll. Seed/steps/guidance/negative are chosen per model, recorded, and never shown.
+
+Carry three things over from the archived plan and drop the rest: **WorkManager** (renders outlive the screen being off), **stream base64 to disk** (or OOM), and **every provider behind one interface from commit one** (permissive hosts change policy; swapping should be a new file, not a refactor).
+
+**Next step:** install Local Dream. Ten minutes, and it answers whether you need to build anything at all.
