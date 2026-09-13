@@ -441,7 +441,11 @@ async function generate() {
       body: JSON.stringify({
         model: getModel(),
         messages: [{ role: "user", content: prompt }],
-        modalities: ["image", "text"],
+        // Image-only models like Muse Image have no endpoint that emits
+        // BOTH image and text output, so asking for ["image","text"]
+        // gets "No endpoints found that support the requested output
+        // modalities" -- request image-only.
+        modalities: ["image"],
       }),
     });
 
