@@ -430,7 +430,11 @@ async function generate() {
   setResultLoading();
 
   try {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    // Muse Image is an image-generation model, not a chat model -- it
+    // lives behind OpenRouter's dedicated Images endpoint, not
+    // /chat/completions (which rejects it outright, per OpenRouter's own
+    // error message).
+    const res = await fetch("https://openrouter.ai/api/v1/images", {
       method: "POST",
       headers: {
         "Authorization": "Bearer " + apiKey,
@@ -440,12 +444,7 @@ async function generate() {
       },
       body: JSON.stringify({
         model: getModel(),
-        messages: [{ role: "user", content: prompt }],
-        // Image-only models like Muse Image have no endpoint that emits
-        // BOTH image and text output, so asking for ["image","text"]
-        // gets "No endpoints found that support the requested output
-        // modalities" -- request image-only.
-        modalities: ["image"],
+        prompt: prompt,
       }),
     });
 
@@ -481,19 +480,16 @@ async function generate() {
     }
 
     const json = JSON.parse(raw);
-    const message = json.choices[0].message;
-    const images = message.images;
+    const images = json.data;
 
     if (!images || images.length === 0) {
-      const text = (message.content || "The model didn't return an image.").trim();
-      showError("The model declined: " + escapeHtml(text));
+      showError("The model didn't return an image.");
       setResultPlaceholder("Your image will appear here");
       return;
     }
 
-    const dataUrl = images[0].image_url.url;
-    const mimeMatch = /^data:([^;]+);base64,/.exec(dataUrl);
-    const mimeType = mimeMatch ? mimeMatch[1] : "image/png";
+    const mimeType = images[0].media_type || "image/png";
+    const dataUrl = "data:" + mimeType + ";base64," + images[0].b64_json;
 
     setResultImage(dataUrl, prompt);
 
